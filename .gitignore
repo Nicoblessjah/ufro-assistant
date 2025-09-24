@@ -1,0 +1,19 @@
+# Entorno virtual
+.venv/
+
+# Archivos de entorno
+.env
+.env.*
+
+# Archivos de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Archivos de datos pesados
+data/index.faiss
+data/processed/*.parquet
+
+# Configuración de VS Code
+.vscode/
