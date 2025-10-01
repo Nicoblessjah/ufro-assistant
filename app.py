@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 import click
 from typing import List, Dict
 
@@ -12,7 +15,9 @@ from rag.prompts import build_messages
 @click.option("--model", default="openai/gpt-4.1-mini", help="Modelo del proveedor.")
 @click.option("--k", default=4, show_default=True, help="Top-k de fragmentos a recuperar.")
 @click.option("--rag/--no-rag", default=True, show_default=True, help="Usar RAG (recuperación + citas).")
-def main(question: str, provider: str, model: str, k: int, rag: bool):
+@click.option("--show-sources/--no-show-sources", default=False, show_default=True,   # <--- NUEVO
+              help="Muestra las fuentes (chunks) recuperadas.")
+def main(question: str, provider: str, model: str, k: int, rag: bool, show_sources: bool):   # <--- agrega show_sources
     """
     CLI para hacer preguntas. Ejemplos:
       python app.py "¿Cuál es la fecha de inicio del semestre 2025?"
@@ -28,7 +33,6 @@ def main(question: str, provider: str, model: str, k: int, rag: bool):
         question = click.prompt("Escribe tu pregunta")
 
     if not rag:
-        # Modo directo (sin recuperación)
         messages: List[Dict[str, str]] = [
             {"role": "system", "content": "Eres un asistente UFRO, responde breve."},
             {"role": "user", "content": question},
@@ -38,13 +42,26 @@ def main(question: str, provider: str, model: str, k: int, rag: bool):
         click.echo(answer)
         return
 
-    # RAG: recuperar contexto y pasar al LLM con política de citas/abstención
+    # RAG
     try:
         retriever = Retriever()
     except Exception as e:
         raise click.ClickException(f"No se pudo inicializar el retriever: {e}")
 
     chunks = retriever.query(question, k=k)
+
+    # Mostrar fuentes recuperadas para depurar
+    if show_sources:  # <-- Asegúrate de que este bloque esté dentro de la función main()
+        click.secho("\nFuentes recuperadas:", fg="cyan")
+    for i, d in enumerate(chunks, 1):
+        # Reemplaza d.get() por acceso directo a las propiedades del fragmento
+        page = getattr(d, "page", 0)
+        title = getattr(d, "title", getattr(d, "doc_id", ""))
+        url = getattr(d, "url", "")
+        snippet = (getattr(d, "text", "").replace("\n", " ")[:250] + ("..." if len(getattr(d, "text", "")) > 250 else ""))
+        click.echo(f"[{i}] {title} (p.{page}) -> {url}")
+        click.echo(f"     {snippet}\n")
+
     context_block = format_context(chunks)
     messages = build_messages(question, context_block)
 
